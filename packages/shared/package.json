@@ -8,12 +8,16 @@
     "build": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "lint": "echo 'lint ok'",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf .turbo node_modules dist"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
@@ -24,6 +28,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "prisma": "^6.0.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.0"
   }
 }

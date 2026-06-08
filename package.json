@@ -12,6 +12,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "db:generate": "npm run db:generate -w packages/shared",
     "db:push": "npm run db:push -w packages/shared",
+    "db:seed": "npm run db:seed -w packages/shared",
     "db:studio": "npm run db:studio -w packages/shared"
   },
   "workspaces": [
