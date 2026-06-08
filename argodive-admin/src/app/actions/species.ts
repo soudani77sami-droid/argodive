@@ -1,9 +1,9 @@
 'use server';
 
-import { createSuccess } from '@/lib/actions';
+import { prisma } from '@argodive/shared';
+import { createSuccess, createError } from '@/lib/actions';
 import type { ActionState } from '@/lib/actions';
 import { revalidatePath } from 'next/cache';
-import { mockList, mockCreate, mockUpdate, mockDelete, toPlainObject } from '@/lib/mock-data';
 
 type SpeciesInput = {
   name: string;
@@ -23,24 +23,76 @@ type SpeciesInput = {
 };
 
 export async function listSpecies(): Promise<ActionState<unknown[]>> {
-  const data = toPlainObject(mockList('species'));
-  return createSuccess(data);
+  try {
+    const data = await prisma.species.findMany({ orderBy: { name: 'asc' } });
+    return createSuccess(data);
+  } catch {
+    return createError('Failed to fetch species');
+  }
 }
 
 export async function createSpecies(data: SpeciesInput): Promise<ActionState> {
-  mockCreate('species', { ...data, category: data.category, isActive: true });
-  revalidatePath('/species');
-  return createSuccess();
+  try {
+    await prisma.species.create({
+      data: {
+        name: data.name,
+        code: data.code,
+        scientificName: data.scientificName,
+        category: data.category as any,
+        description: data.description,
+        optimalTempMin: data.optimalTempMin,
+        optimalTempMax: data.optimalTempMax,
+        optimalSalinityMin: data.optimalSalinityMin,
+        optimalSalinityMax: data.optimalSalinityMax,
+        optimalDO: data.optimalDO,
+        growthRate: data.growthRate,
+        maxDensity: data.maxDensity,
+        avgMarketWeight: data.avgMarketWeight,
+        daysToHarvest: data.daysToHarvest,
+        isActive: true,
+      },
+    });
+    revalidatePath('/species');
+    return createSuccess();
+  } catch {
+    return createError('Failed to create species');
+  }
 }
 
 export async function updateSpecies(id: string, data: SpeciesInput): Promise<ActionState> {
-  mockUpdate('species', id, { ...data, category: data.category });
-  revalidatePath('/species');
-  return createSuccess();
+  try {
+    await prisma.species.update({
+      where: { id },
+      data: {
+        name: data.name,
+        code: data.code,
+        scientificName: data.scientificName,
+        category: data.category as any,
+        description: data.description,
+        optimalTempMin: data.optimalTempMin,
+        optimalTempMax: data.optimalTempMax,
+        optimalSalinityMin: data.optimalSalinityMin,
+        optimalSalinityMax: data.optimalSalinityMax,
+        optimalDO: data.optimalDO,
+        growthRate: data.growthRate,
+        maxDensity: data.maxDensity,
+        avgMarketWeight: data.avgMarketWeight,
+        daysToHarvest: data.daysToHarvest,
+      },
+    });
+    revalidatePath('/species');
+    return createSuccess();
+  } catch {
+    return createError('Failed to update species');
+  }
 }
 
 export async function deleteSpecies(id: string): Promise<ActionState> {
-  mockDelete('species', id);
-  revalidatePath('/species');
-  return createSuccess();
+  try {
+    await prisma.species.delete({ where: { id } });
+    revalidatePath('/species');
+    return createSuccess();
+  } catch {
+    return createError('Failed to delete species');
+  }
 }

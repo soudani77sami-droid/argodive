@@ -1,28 +1,12 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Download, FileText, TrendingUp, Activity } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
-
-const monthlyData = [
-  { month: 'Jan', harvest: 120, mortality: 8, transfers: 15 },
-  { month: 'Feb', harvest: 95, mortality: 12, transfers: 10 },
-  { month: 'Mar', harvest: 140, mortality: 6, transfers: 18 },
-  { month: 'Apr', harvest: 160, mortality: 10, transfers: 22 },
-  { month: 'May', harvest: 180, mortality: 7, transfers: 20 },
-  { month: 'Jun', harvest: 200, mortality: 9, transfers: 25 },
-];
-
-const growthData = [
-  { week: 'W1', salmon: 0.8, trout: 1.0, bass: 0.6 },
-  { week: 'W2', salmon: 1.0, trout: 1.2, bass: 0.7 },
-  { week: 'W3', salmon: 1.1, trout: 1.3, bass: 0.8 },
-  { week: 'W4', salmon: 1.3, trout: 1.5, bass: 0.9 },
-  { week: 'W5', salmon: 1.4, trout: 1.6, bass: 1.0 },
-  { week: 'W6', salmon: 1.6, trout: 1.8, bass: 1.1 },
-];
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { getDashboardStats } from '@/app/actions/data';
 
 const reports = [
   { title: 'Monthly Production Report - May 2026', date: 'Jun 1, 2026', type: 'PDF', size: '2.4 MB' },
@@ -34,6 +18,33 @@ const reports = [
 ];
 
 export default function ReportsPage() {
+  const [monthlyData, setMonthlyData] = useState([
+    { month: 'Jan', harvest: 0, mortality: 0, transfers: 0 },
+    { month: 'Jun', harvest: 0, mortality: 0, transfers: 0 },
+  ]);
+  const [growthData, setGrowthData] = useState<{ week: string; salmon: number; trout: number }[]>([]);
+
+  useEffect(() => {
+    getDashboardStats().then((result) => {
+      const currMonth = new Date().toLocaleString('default', { month: 'short' });
+      const totalFish = result.cages.reduce((s: number, c: any) => s + (c.currentFishCount ?? 0), 0);
+      const totalBiomass = result.cages.reduce((s: number, c: any) => s + (c.currentBiomass ?? 0), 0);
+      const transferCount = result.transfers.length;
+
+      setMonthlyData([
+        { month: currMonth, harvest: Math.round(totalBiomass / 100), mortality: 0, transfers: transferCount },
+      ]);
+
+      const salmonSpecies = result.species.find((s: any) => s.code === 'SAL');
+      const troutSpecies = result.species.find((s: any) => s.code === 'RBT');
+      if (salmonSpecies || troutSpecies) {
+        setGrowthData([
+          { week: 'Current', salmon: salmonSpecies?.growthRate ?? 0, trout: troutSpecies?.growthRate ?? 0 },
+        ]);
+      }
+    });
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -52,10 +63,10 @@ export default function ReportsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip contentStyle={{ background: 'var(--card))', border: '1px solid var(--border))', borderRadius: 'var(--radius)', fontSize: 13 }} />
-                  <Bar dataKey="harvest" name="Harvest (tons)" fill="var(--chart-1))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="harvest" name="Harvest (t)" fill="var(--chart-1))" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="transfers" name="Transfers" fill="var(--chart-2))" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -64,18 +75,17 @@ export default function ReportsPage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4 text-ocean" /> Growth by Species</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4 text-ocean" /> Growth Rate by Species</CardTitle></CardHeader>
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={growthData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip contentStyle={{ background: 'var(--card))', border: '1px solid var(--border))', borderRadius: 'var(--radius)', fontSize: 13 }} />
                   <Line type="monotone" dataKey="salmon" name="Salmon" stroke="var(--chart-1))" strokeWidth={2} dot={{ r: 3 }} />
                   <Line type="monotone" dataKey="trout" name="Trout" stroke="var(--chart-2))" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="bass" name="Bass" stroke="var(--chart-3))" strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -83,42 +93,34 @@ export default function ReportsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Mortality Trend</CardTitle></CardHeader>
-          <CardContent>
-            <div className="h-44">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <Tooltip contentStyle={{ background: 'var(--card))', border: '1px solid var(--border))', borderRadius: 'var(--radius)', fontSize: 13 }} />
-                  <Area type="monotone" dataKey="mortality" stroke="var(--destructive))" fill="var(--destructive))" fillOpacity={0.15} strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle className="text-base">Available Reports</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {reports.map((r) => (
-                <div key={r.title} className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50">
-                  <FileText className="h-8 w-8 shrink-0 text-ocean" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{r.title}</p>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileText className="h-4 w-4 text-ocean" /> Generated Reports
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {reports.map((r, i) => (
+              <div key={i} className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ocean/10 text-ocean">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{r.title}</p>
                     <p className="text-xs text-muted-foreground">{r.date} &middot; {r.size}</p>
                   </div>
-                  <Badge variant="secondary">{r.type}</Badge>
-                  <Button variant="ghost" size="icon"><Download className="h-4 w-4" /></Button>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{r.type}</Badge>
+                  <Button variant="ghost" size="icon" className="h-8 w-8"><Download className="h-4 w-4" /></Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

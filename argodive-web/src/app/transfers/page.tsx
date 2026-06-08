@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ColumnDef, flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, SortingState, useReactTable,
 } from '@tanstack/react-table';
@@ -10,26 +10,36 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search, ArrowUpDown, ArrowRight } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { getTransfersList } from '@/app/actions/data';
 
 type Transfer = {
   id: string; fromCage: string; toCage: string; species: string; fishCount: number;
   reason: string; scheduledDate: string; completedDate: string | null; status: string;
 };
 
-const data: Transfer[] = [
-  { id: '1', fromCage: 'C-001', toCage: 'C-002', species: 'Atlantic Salmon', fishCount: 5000, reason: 'Splitting', scheduledDate: '2026-06-01', completedDate: '2026-06-01', status: 'Completed' },
-  { id: '2', fromCage: 'C-003', toCage: 'C-004', species: 'Rainbow Trout', fishCount: 3000, reason: 'Grading', scheduledDate: '2026-06-03', completedDate: '2026-06-03', status: 'Completed' },
-  { id: '3', fromCage: 'C-005', toCage: 'C-006', species: 'Tilapia', fishCount: 8000, reason: 'Stocking', scheduledDate: '2026-06-05', completedDate: null, status: 'In Progress' },
-  { id: '4', fromCage: 'C-001', toCage: 'C-008', species: 'Atlantic Salmon', fishCount: 4000, reason: 'Medical Treatment', scheduledDate: '2026-06-08', completedDate: null, status: 'Planned' },
-  { id: '5', fromCage: 'C-007', toCage: 'C-002', species: 'Yellowtail', fishCount: 2000, reason: 'Relocation', scheduledDate: '2026-06-10', completedDate: null, status: 'Planned' },
-  { id: '6', fromCage: 'C-003', toCage: 'C-005', species: 'Rainbow Trout', fishCount: 6000, reason: 'Harvest', scheduledDate: '2026-05-28', completedDate: '2026-05-28', status: 'Completed' },
-];
+function transferStatus(s: string) {
+  switch (s) {
+    case 'COMPLETED': return 'Completed';
+    case 'IN_PROGRESS': return 'In Progress';
+    case 'PLANNED': return 'Planned';
+    case 'CANCELLED': return 'Cancelled';
+    default: return s;
+  }
+}
 
-const reasonData = [
-  { reason: 'Grading', count: 1 }, { reason: 'Splitting', count: 1 }, { reason: 'Stocking', count: 1 },
-  { reason: 'Medical', count: 1 }, { reason: 'Relocation', count: 1 }, { reason: 'Harvest', count: 1 },
-];
+function transferReason(s: string) {
+  switch (s) {
+    case 'GRADING': return 'Grading';
+    case 'STOCKING': return 'Stocking';
+    case 'RESTOCKING': return 'Restocking';
+    case 'HARVEST': return 'Harvest';
+    case 'SPLITTING': return 'Splitting';
+    case 'MEDICAL_TREATMENT': return 'Medical Treatment';
+    case 'MORTALITY_REMOVAL': return 'Mortality Removal';
+    case 'RELOCATION': return 'Relocation';
+    default: return s;
+  }
+}
 
 const columns: ColumnDef<Transfer>[] = [
   {
@@ -54,61 +64,94 @@ const columns: ColumnDef<Transfer>[] = [
 export default function TransfersPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
-  const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel(), getPaginationRowModel: getPaginationRowModel(), getSortedRowModel: getSortedRowModel(), onSortingChange: setSorting, state: { sorting, globalFilter } });
+  const [data, setData] = useState<Transfer[]>([]);
+
+  useEffect(() => {
+    getTransfersList().then((transfers) => {
+      const mapped: Transfer[] = transfers.map((t: any) => ({
+        id: t.id,
+        fromCage: t.fromCage?.cageNumber ?? '',
+        toCage: t.toCage?.cageNumber ?? '',
+        species: t.species?.name ?? '',
+        fishCount: t.fishCount,
+        reason: transferReason(t.reason),
+        scheduledDate: t.scheduledDate?.slice(0, 10) ?? '',
+        completedDate: t.completedDate?.slice(0, 10) ?? null,
+        status: transferStatus(t.status),
+      }));
+      setData(mapped);
+    });
+  }, []);
+
+  const table = useReactTable({
+    data, columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
+    state: { sorting, globalFilter },
+  });
+
+  const reasonData = Object.entries(
+    data.reduce((acc, t) => {
+      acc[t.reason] = (acc[t.reason] ?? 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+  ).map(([reason, count]) => ({ reason, count }));
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-ocean-dark">Fish Transfers</h1>
-        <p className="text-muted-foreground">Track stock movements between cages</p>
+        <p className="text-muted-foreground">Track fish movements between cages</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-3">
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Total Transfers</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{data.length}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Completed</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-600">{data.filter(t => t.status === 'Completed').length}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Planned / Active</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-ocean">{data.filter(t => t.status !== 'Completed').length}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Fish Moved</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{data.reduce((s, t) => s + t.fishCount, 0).toLocaleString()}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Completed</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-600">{data.filter(d => d.status === 'Completed').length}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">In Progress / Planned</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-amber-600">{data.filter(d => d.status === 'In Progress' || d.status === 'Planned').length}</div></CardContent></Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-4">
-        <Card className="lg:col-span-1">
-          <CardHeader><CardTitle className="text-sm">By Reason</CardTitle></CardHeader>
-          <CardContent>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={reasonData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} />
-                  <YAxis dataKey="reason" type="category" tick={{ fontSize: 11 }} width={70} />
-                  <Bar dataKey="count" fill="var(--chart-1))" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">All Transfers</CardTitle>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="Search transfers..." value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} className="h-9 max-w-sm pl-9" />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Transfer Log</CardTitle>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search..." value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} className="h-9 max-w-sm pl-9" />
-              </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((hg) => (
+                <TableRow key={hg.id}>
+                  {hg.headers.map((h) => (
+                    <TableHead key={h.id}>{h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}</TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <div className="flex items-center justify-between pt-4">
+            <p className="text-sm text-muted-foreground">Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}</p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Previous</Button>
+              <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Next</Button>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>{table.getHeaderGroups().map((hg) => (<TableRow key={hg.id}>{hg.headers.map((h) => (<TableHead key={h.id}>{h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}</TableHead>))}</TableRow>))}</TableHeader>
-              <TableBody>{table.getRowModel().rows.map((row) => (<TableRow key={row.id}>{row.getVisibleCells().map((cell) => (<TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>))}</TableRow>))}</TableBody>
-            </Table>
-            <div className="flex items-center justify-between pt-4">
-              <p className="text-sm text-muted-foreground">Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}</p>
-              <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Previous</Button><Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Next</Button></div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

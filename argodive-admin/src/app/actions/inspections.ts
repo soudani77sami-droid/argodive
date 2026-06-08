@@ -1,9 +1,9 @@
 'use server';
 
-import { createSuccess } from '@/lib/actions';
+import { prisma } from '@argodive/shared';
+import { createSuccess, createError } from '@/lib/actions';
 import type { ActionState } from '@/lib/actions';
 import { revalidatePath } from 'next/cache';
-import { mockList, mockCreate, mockUpdate, mockDelete, toPlainObject } from '@/lib/mock-data';
 
 type InspectionInput = {
   title: string;
@@ -18,24 +18,68 @@ type InspectionInput = {
 };
 
 export async function listInspections(): Promise<ActionState<unknown[]>> {
-  const data = toPlainObject(mockList('inspections'));
-  return createSuccess(data);
+  try {
+    const data = await prisma.inspection.findMany({
+      include: { cage: true, conductedBy: true },
+      orderBy: { scheduledDate: 'desc' },
+    });
+    return createSuccess(data);
+  } catch {
+    return createError('Failed to fetch inspections');
+  }
 }
 
 export async function createInspection(data: InspectionInput): Promise<ActionState> {
-  mockCreate('inspections', data);
-  revalidatePath('/inspections');
-  return createSuccess();
+  try {
+    await prisma.inspection.create({
+      data: {
+        title: data.title,
+        cageId: data.cageId,
+        inspectionType: data.inspectionType as any,
+        description: data.description,
+        scheduledDate: new Date(data.scheduledDate),
+        healthScore: data.healthScore,
+        findings: data.findings,
+        recommendations: data.recommendations,
+        status: data.status as any,
+      },
+    });
+    revalidatePath('/inspections');
+    return createSuccess();
+  } catch {
+    return createError('Failed to create inspection');
+  }
 }
 
 export async function updateInspection(id: string, data: InspectionInput): Promise<ActionState> {
-  mockUpdate('inspections', id, data);
-  revalidatePath('/inspections');
-  return createSuccess();
+  try {
+    await prisma.inspection.update({
+      where: { id },
+      data: {
+        title: data.title,
+        cageId: data.cageId,
+        inspectionType: data.inspectionType as any,
+        description: data.description,
+        scheduledDate: new Date(data.scheduledDate),
+        healthScore: data.healthScore,
+        findings: data.findings,
+        recommendations: data.recommendations,
+        status: data.status as any,
+      },
+    });
+    revalidatePath('/inspections');
+    return createSuccess();
+  } catch {
+    return createError('Failed to update inspection');
+  }
 }
 
 export async function deleteInspection(id: string): Promise<ActionState> {
-  mockDelete('inspections', id);
-  revalidatePath('/inspections');
-  return createSuccess();
+  try {
+    await prisma.inspection.delete({ where: { id } });
+    revalidatePath('/inspections');
+    return createSuccess();
+  } catch {
+    return createError('Failed to delete inspection');
+  }
 }

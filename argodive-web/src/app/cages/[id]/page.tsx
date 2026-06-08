@@ -2,48 +2,19 @@
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
-  ArrowLeft, MapPin, Thermometer, Droplets, Activity,
-  Fish, Waves, AlertTriangle,
-  Image, ArrowRight, ArrowLeftRight, ClipboardCheck,
+  ArrowLeft, MapPin, Thermometer, Fish, Waves, AlertTriangle,
+  Image, ArrowRight, ArrowLeftRight, ClipboardCheck, Activity, ArrowLeft as ArrowLeftIcon,
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { DownloadCageReport } from '@/components/pdf/download-button';
-
-// ---------- Mock data ----------
-
-const cageDetail = {
-  id: 'C-001',
-  cageNumber: 'C-001',
-  name: 'North Alpha',
-  site: 'North Farm',
-  siteId: 'S-001',
-  species: 'Atlantic Salmon',
-  speciesId: 'SP-001',
-  shape: 'Circular',
-  diameter: 25,
-  circumference: 78.5,
-  depth: 15,
-  volume: 1200,
-  maxCapacity: 60000,
-  currentFishCount: 45000,
-  currentBiomass: 180000,
-  avgWeight: 4.0,
-  stockingDensity: 37.5,
-  status: 'Active',
-  healthScore: 92,
-  installationDate: '2024-03-15',
-  lastCleaningDate: '2026-05-20',
-  lastStockingDate: '2025-09-01',
-  lastHarvestDate: '2025-08-15',
-  notes: 'Primary grow-out cage for Atlantic Salmon. Consistent performance with above-average health metrics.',
-};
+import { getCageDetail } from '@/app/actions/data';
 
 const envReadings = [
   { date: 'Jun 1', temp: 14.2, do: 7.8, salinity: 32.1 },
@@ -55,72 +26,116 @@ const envReadings = [
   { date: 'Jun 7', temp: 14.0, do: 7.7, salinity: 32.5 },
 ];
 
-const nets = [
-  { id: 'N-001', netNumber: 'N-001', meshSize: 22, material: 'Nylon', depth: 15, circumference: 78.5, condition: 'Good', conditionColor: 'green', installationDate: '2025-08-15', lastCleaning: '2026-05-20', lastRepair: null, ageDays: 296 },
-  { id: 'N-002', netNumber: 'N-002', meshSize: 18, material: 'Polyethylene', depth: 15, circumference: 78.5, condition: 'Excellent', conditionColor: 'green', installationDate: '2026-03-01', lastCleaning: '2026-06-01', lastRepair: null, ageDays: 98 },
-  { id: 'N-003', netNumber: 'N-003', meshSize: 22, material: 'Nylon', depth: 15, circumference: 78.5, condition: 'Fair', conditionColor: 'yellow', installationDate: '2025-06-20', lastCleaning: '2026-04-10', lastRepair: '2026-02-15', ageDays: 352 },
-  { id: 'N-004', netNumber: 'N-004', meshSize: 25, material: 'Nylon', depth: 15, circumference: 78.5, condition: 'Damaged', conditionColor: 'red', installationDate: '2025-04-05', lastCleaning: '2026-02-15', lastRepair: null, ageDays: 428 },
-];
-
-const inspections = [
-  { id: 'I-001', title: 'Monthly Routine Check', type: 'Routine', date: '2026-06-01', inspector: 'Sarah M.', healthScore: 92, findings: 'Cage integrity good. Biofouling minimal. Fish behavior normal.', status: 'Completed' },
-  { id: 'I-002', title: 'Post-Storm Assessment', type: 'Post-Storm', date: '2026-05-15', inspector: 'John D.', healthScore: 88, findings: 'Minor net deformation observed. No structural damage. DO levels recovered.', status: 'Completed' },
-  { id: 'I-003', title: 'Bi-monthly Health Check', type: 'Health', date: '2026-05-01', inspector: 'Sarah M.', healthScore: 90, findings: 'All parameters within range. Growth rate consistent with projections.', status: 'Completed' },
-  { id: 'I-004', title: 'Structural Integrity Check', type: 'Structural', date: '2026-04-10', inspector: 'Mike T.', healthScore: 85, findings: 'Net N-003 shows wear at connection points. Scheduled for repair.', status: 'Completed' },
-  { id: 'I-005', title: 'Environmental Monitoring', type: 'Environmental', date: '2026-03-20', inspector: 'John D.', healthScore: 91, findings: 'Water quality excellent. Plankton levels normal.', status: 'Completed' },
-];
-
-const photos = [
-  { id: 'P-001', caption: 'Net condition inspection - North side', date: '2026-06-01', photographer: 'Sarah M.' },
-  { id: 'P-002', caption: 'Biofouling assessment N-003', date: '2026-05-15', photographer: 'John D.' },
-  { id: 'P-003', caption: 'Fish health sampling session', date: '2026-05-01', photographer: 'Sarah M.' },
-  { id: 'P-004', caption: 'Cage structure overview', date: '2026-04-10', photographer: 'Mike T.' },
-  { id: 'P-005', caption: 'DO sensor calibration check', date: '2026-03-20', photographer: 'John D.' },
-  { id: 'P-006', caption: 'Feed behavior observation', date: '2026-03-15', photographer: 'Sarah M.' },
-];
-
-const transfers = [
-  { id: 'T-001', direction: 'out', fromCage: 'C-001', toCage: 'C-002', fishCount: 5000, reason: 'Splitting', date: '2026-06-01', performedBy: 'John D.', status: 'Completed' },
-  { id: 'T-002', direction: 'out', fromCage: 'C-001', toCage: 'C-008', fishCount: 4000, reason: 'Medical Treatment', date: '2026-06-08', performedBy: 'Sarah M.', status: 'Planned' },
-  { id: 'T-003', direction: 'in', fromCage: 'C-003', toCage: 'C-001', fishCount: 8000, reason: 'Stocking', date: '2025-09-01', performedBy: 'Mike T.', status: 'Completed' },
-  { id: 'T-004', direction: 'out', fromCage: 'C-001', toCage: 'C-005', fishCount: 2000, reason: 'Grading', date: '2025-07-15', performedBy: 'John D.', status: 'Completed' },
-];
-
-// ---------- Helpers ----------
-
-const statusBadge = (status: string) => {
+function statusBadge(status: string) {
   const map: Record<string, 'success' | 'warning' | 'destructive' | 'secondary' | 'info'> = {
-    Active: 'success', Completed: 'success', Planned: 'secondary', Harvesting: 'warning', Maintenance: 'destructive', Fallow: 'secondary', Empty: 'secondary',
+    ACTIVE: 'success', COMPLETED: 'success', PLANNED: 'secondary',
+    HARVESTING: 'warning', MAINTENANCE: 'destructive', FALLOW: 'secondary', EMPTY: 'secondary',
   };
   return <Badge variant={map[status] || 'secondary'}>{status}</Badge>;
-};
+}
 
-const conditionDot = (color: string) => {
+function conditionColor(condition: string) {
+  switch (condition) {
+    case 'EXCELLENT': case 'GOOD': return 'green';
+    case 'FAIR': return 'yellow';
+    case 'POOR': case 'DAMAGED': return 'red';
+    default: return 'gray';
+  }
+}
+
+function conditionDot(color: string) {
   const colors: Record<string, string> = {
     green: 'bg-emerald-500',
     yellow: 'bg-amber-400',
     red: 'bg-destructive',
+    gray: 'bg-muted',
   };
   return <span className={`inline-block h-3 w-3 rounded-full ${colors[color] || 'bg-muted'}`} />;
-};
+}
 
 export default function CageDetailPage() {
   const params = useParams();
   const cageId = params.id as string;
+  const [cage, setCage] = useState<any>(null);
 
-  // In production, fetch by cageId. For now, use mock data scoped to C-001.
-  const cage = cageDetail;
+  useEffect(() => {
+    getCageDetail(cageId).then(setCage);
+  }, [cageId]);
+
+  if (!cage) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Link href="/cages" className="hover:text-ocean transition-colors">Cages</Link>
+          <span>/</span>
+          <span className="text-foreground font-medium">{cageId}</span>
+        </div>
+        <p className="text-muted-foreground">Loading cage data...</p>
+      </div>
+    );
+  }
+
+  const nets = (cage.nets ?? []).map((n: any) => ({
+    ...n,
+    conditionColor: conditionColor(n.condition),
+    ageDays: n.installationDate ? Math.floor((Date.now() - new Date(n.installationDate).getTime()) / 86400000) : 0,
+    lastCleaning: n.lastCleaningDate?.slice(0, 10) ?? '--',
+    lastRepair: n.lastRepairDate?.slice(0, 10) ?? null,
+  }));
+
+  const inspections = (cage.inspections ?? []).map((i: any) => ({
+    id: i.id,
+    title: i.title,
+    type: i.inspectionType,
+    date: i.scheduledDate?.slice(0, 10) ?? '',
+    inspector: i.conductedBy?.name ?? 'TBD',
+    healthScore: i.healthScore ?? 0,
+    findings: i.findings ?? '',
+    status: i.status === 'COMPLETED' ? 'Completed' : i.status === 'SCHEDULED' ? 'Scheduled' : i.status,
+  }));
+
+  const photos = (cage.inspections ?? []).flatMap((i: any) =>
+    (i.photos ?? []).map((p: any) => ({
+      id: p.id,
+      caption: p.caption ?? '',
+      date: p.takenAt?.slice(0, 10) ?? i.scheduledDate?.slice(0, 10) ?? '',
+      photographer: i.conductedBy?.name ?? '',
+    })),
+  );
+
+  const transfers = [
+    ...(cage.transfersFrom ?? []).map((t: any) => ({
+      id: t.id,
+      direction: 'out' as const,
+      fromCage: cage.cageNumber,
+      toCage: t.toCage?.cageNumber ?? '',
+      fishCount: t.fishCount,
+      reason: t.reason,
+      date: t.scheduledDate?.slice(0, 10) ?? '',
+      performedBy: t.performedBy?.name ?? 'TBD',
+      status: t.status === 'COMPLETED' ? 'Completed' : t.status === 'PLANNED' ? 'Planned' : t.status,
+    })),
+    ...(cage.transfersTo ?? []).map((t: any) => ({
+      id: t.id,
+      direction: 'in' as const,
+      fromCage: t.fromCage?.cageNumber ?? '',
+      toCage: cage.cageNumber,
+      fishCount: t.fishCount,
+      reason: t.reason,
+      date: t.scheduledDate?.slice(0, 10) ?? '',
+      performedBy: t.performedBy?.name ?? 'TBD',
+      status: t.status === 'COMPLETED' ? 'Completed' : t.status === 'PLANNED' ? 'Planned' : t.status,
+    })),
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Link href="/cages" className="hover:text-ocean transition-colors">Cages</Link>
         <span>/</span>
         <span className="text-foreground font-medium">{cageId}</span>
       </div>
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link href="/cages">
@@ -134,18 +149,16 @@ export default function CageDetailPage() {
               {statusBadge(cage.status)}
             </div>
             <p className="text-muted-foreground flex items-center gap-2 mt-1">
-              <MapPin className="h-3.5 w-3.5" /> {cage.site} &middot; {cage.name} &middot; {cage.species}
+              <MapPin className="h-3.5 w-3.5" /> {cage.site?.name ?? ''} &middot; {cage.name ?? ''} &middot; {cage.species?.name ?? ''}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <DownloadCageReport cage={cage} nets={nets} inspections={inspections} photos={photos} />
           <Button variant="outline" size="sm">Edit Cage</Button>
           <Button size="sm">Schedule Inspection</Button>
         </div>
       </div>
 
-      {/* ===== 1. GENERAL INFORMATION ===== */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -156,67 +169,59 @@ export default function CageDetailPage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Species</p>
-              <p className="text-sm font-medium">{cage.species}</p>
+              <p className="text-sm font-medium">{cage.species?.name ?? 'None'}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Shape / Diameter</p>
-              <p className="text-sm font-medium">{cage.shape} &middot; {cage.diameter}m</p>
+              <p className="text-sm font-medium">{cage.shape} &middot; {cage.diameter ?? 0}m</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Volume</p>
-              <p className="text-sm font-medium">{cage.volume.toLocaleString()} m³</p>
+              <p className="text-sm font-medium">{(cage.volume ?? 0).toLocaleString()} m³</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Max Capacity</p>
-              <p className="text-sm font-medium">{cage.maxCapacity.toLocaleString()} fish</p>
+              <p className="text-sm font-medium">{(cage.maxCapacity ?? 0).toLocaleString()} fish</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Current Fish</p>
-              <p className="text-sm font-medium">{cage.currentFishCount.toLocaleString()}</p>
+              <p className="text-sm font-medium">{(cage.currentFishCount ?? 0).toLocaleString()}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Biomass</p>
-              <p className="text-sm font-medium">{(cage.currentBiomass / 1000).toFixed(1)} t</p>
+              <p className="text-sm font-medium">{((cage.currentBiomass ?? 0) / 1000).toFixed(1)} t</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Avg Weight</p>
-              <p className="text-sm font-medium">{cage.avgWeight} kg</p>
+              <p className="text-sm font-medium">{cage.avgWeight ?? 0} kg</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Stocking Density</p>
-              <p className="text-sm font-medium">{cage.stockingDensity} kg/m³</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Health Score</p>
-              <p className="text-sm font-medium flex items-center gap-2">
-                {cage.healthScore}
-                <span className={`inline-block h-2.5 w-16 rounded-full bg-muted overflow-hidden`}>
-                  <span className={`block h-full rounded-full ${cage.healthScore >= 80 ? 'bg-emerald-500' : cage.healthScore >= 60 ? 'bg-amber-400' : 'bg-destructive'}`} style={{ width: `${cage.healthScore}%` }} />
-                </span>
-              </p>
+              <p className="text-sm font-medium">{cage.stockingDensity ?? 0} kg/m³</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Installed</p>
-              <p className="text-sm font-medium">{cage.installationDate}</p>
+              <p className="text-sm font-medium">{cage.installationDate?.slice(0, 10) ?? '--'}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Last Cleaned</p>
-              <p className="text-sm font-medium">{cage.lastCleaningDate}</p>
+              <p className="text-sm font-medium">{cage.lastCleaningDate?.slice(0, 10) ?? '--'}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Last Stocked</p>
-              <p className="text-sm font-medium">{cage.lastStockingDate}</p>
+              <p className="text-sm font-medium">{cage.lastStockingDate?.slice(0, 10) ?? '--'}</p>
             </div>
           </div>
 
           <Separator className="my-4" />
 
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Notes</p>
-            <p className="text-sm">{cage.notes}</p>
-          </div>
+          {cage.notes && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Notes</p>
+              <p className="text-sm">{cage.notes}</p>
+            </div>
+          )}
 
-          {/* Environmental chart */}
           <div className="mt-6">
             <p className="text-sm font-medium mb-3 flex items-center gap-2">
               <Thermometer className="h-4 w-4 text-ocean" /> Environmental Readings (7 days)
@@ -238,7 +243,6 @@ export default function CageDetailPage() {
         </CardContent>
       </Card>
 
-      {/* ===== 2. NET INFORMATION ===== */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
@@ -252,7 +256,8 @@ export default function CageDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2">
-            {nets.map((net) => (
+            {nets.length === 0 && <p className="text-sm text-muted-foreground col-span-2">No nets recorded for this cage.</p>}
+            {nets.map((net: any) => (
               <div
                 key={net.id}
                 className={`rounded-lg border p-4 transition-shadow hover:shadow-sm ${
@@ -271,10 +276,10 @@ export default function CageDetailPage() {
                   </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                  <span>Mesh: {net.meshSize}mm</span>
+                  <span>Mesh: {net.meshSize ?? '--'}mm</span>
                   <span>{net.material}</span>
-                  <span>Depth: {net.depth}m</span>
-                  <span>Circum: {net.circumference}m</span>
+                  <span>Depth: {net.depth ?? '--'}m</span>
+                  <span>Circum: {net.circumference ?? '--'}m</span>
                   <span>Age: {net.ageDays} days</span>
                   <span>Cleaned: {net.lastCleaning}</span>
                 </div>
@@ -289,7 +294,6 @@ export default function CageDetailPage() {
         </CardContent>
       </Card>
 
-      {/* ===== 3. INSPECTION HISTORY ===== */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -298,7 +302,8 @@ export default function CageDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {inspections.map((ins) => (
+            {inspections.length === 0 && <p className="text-sm text-muted-foreground">No inspections recorded for this cage.</p>}
+            {inspections.map((ins: any) => (
               <div key={ins.id} className="flex items-start gap-4 rounded-lg border p-4">
                 <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                   ins.healthScore >= 85 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' :
@@ -313,7 +318,7 @@ export default function CageDetailPage() {
                       <p className="text-sm font-medium">{ins.title}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{ins.type} &middot; {ins.date} &middot; {ins.inspector}</p>
                     </div>
-                    <Badge variant="success">{ins.status}</Badge>
+                    {statusBadge(ins.status)}
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">{ins.findings}</p>
                 </div>
@@ -323,17 +328,16 @@ export default function CageDetailPage() {
         </CardContent>
       </Card>
 
-      {/* ===== 4. PHOTO GALLERY ===== */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Image className="h-4 w-4 text-ocean" /> Photo Gallery
           </CardTitle>
-          <Button variant="outline" size="sm">View All</Button>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {photos.map((photo) => (
+            {photos.length === 0 && <p className="text-sm text-muted-foreground col-span-3">No photos available for this cage.</p>}
+            {photos.map((photo: any) => (
               <div key={photo.id} className="group cursor-pointer rounded-lg border overflow-hidden transition-shadow hover:shadow-md">
                 <div className="aspect-[4/3] bg-gradient-to-br from-ocean-light/10 to-seafoam/20 flex items-center justify-center relative">
                   <Image className="h-8 w-8 text-ocean-light/40" />
@@ -351,7 +355,6 @@ export default function CageDetailPage() {
         </CardContent>
       </Card>
 
-      {/* ===== 5. FISH TRANSFER HISTORY ===== */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -360,7 +363,8 @@ export default function CageDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {transfers.map((t) => (
+            {transfers.length === 0 && <p className="text-sm text-muted-foreground">No transfers recorded for this cage.</p>}
+            {transfers.map((t: any) => (
               <div key={t.id} className="flex items-center gap-4 rounded-lg border p-4">
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                   t.direction === 'out' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
@@ -368,7 +372,7 @@ export default function CageDetailPage() {
                   {t.direction === 'out' ? (
                     <ArrowRight className="h-4 w-4" />
                   ) : (
-                    <ArrowLeft className="h-4 w-4" />
+                    <ArrowLeftIcon className="h-4 w-4" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -396,5 +400,3 @@ export default function CageDetailPage() {
     </div>
   );
 }
-
-

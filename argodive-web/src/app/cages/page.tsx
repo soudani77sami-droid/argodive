@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ColumnDef, flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, SortingState, useReactTable,
 } from '@tanstack/react-table';
@@ -10,29 +10,24 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search, ArrowUpDown, MapPin } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { getDashboardStats } from '@/app/actions/data';
 
 type Cage = {
   id: string; cageNumber: string; site: string; species: string; diameter: number;
   fishCount: number; biomass: number; doLevel: number; temp: number; status: string; healthScore: number;
 };
 
-const data: Cage[] = [
-  { id: '1', cageNumber: 'C-001', site: 'North Farm', species: 'Atlantic Salmon', diameter: 25, fishCount: 45000, biomass: 180000, doLevel: 7.8, temp: 14.2, status: 'Active', healthScore: 92 },
-  { id: '2', cageNumber: 'C-002', site: 'North Farm', species: 'Atlantic Salmon', diameter: 25, fishCount: 42000, biomass: 168000, doLevel: 7.5, temp: 14.5, status: 'Active', healthScore: 88 },
-  { id: '3', cageNumber: 'C-003', site: 'South Bay', species: 'Rainbow Trout', diameter: 20, fishCount: 35000, biomass: 70000, doLevel: 8.1, temp: 13.8, status: 'Active', healthScore: 95 },
-  { id: '4', cageNumber: 'C-004', site: 'South Bay', species: 'Sea Bass', diameter: 18, fishCount: 12000, biomass: 18000, doLevel: 7.9, temp: 15.2, status: 'Empty', healthScore: 0 },
-  { id: '5', cageNumber: 'C-005', site: 'East Cove', species: 'Tilapia', diameter: 22, fishCount: 28000, biomass: 22400, doLevel: 6.5, temp: 16.1, status: 'Active', healthScore: 78 },
-  { id: '6', cageNumber: 'C-006', site: 'North Farm', species: 'Atlantic Salmon', diameter: 30, fishCount: 65000, biomass: 260000, doLevel: 7.2, temp: 14.8, status: 'Harvesting', healthScore: 85 },
-  { id: '7', cageNumber: 'C-007', site: 'East Cove', species: 'Yellowtail', diameter: 24, fishCount: 15000, biomass: 48000, doLevel: 6.8, temp: 15.5, status: 'Maintenance', healthScore: 45 },
-  { id: '8', cageNumber: 'C-008', site: 'South Bay', species: 'Rainbow Trout', diameter: 20, fishCount: 0, biomass: 0, doLevel: 0, temp: 0, status: 'Fallow', healthScore: 0 },
-];
-
-const siteData = [
-  { site: 'North Farm', cages: 3, fish: 152000, health: 88 },
-  { site: 'South Bay', cages: 2, fish: 47000, health: 95 },
-  { site: 'East Cove', cages: 2, fish: 43000, health: 62 },
-];
+function cageStatus(s: string) {
+  switch (s) {
+    case 'ACTIVE': return 'Active';
+    case 'EMPTY': return 'Empty';
+    case 'STOCKING': return 'Stocking';
+    case 'HARVESTING': return 'Harvesting';
+    case 'FALLOW': return 'Fallow';
+    case 'MAINTENANCE': return 'Maintenance';
+    default: return s;
+  }
+}
 
 const columns: ColumnDef<Cage>[] = [
   {
@@ -104,6 +99,58 @@ const columns: ColumnDef<Cage>[] = [
 export default function CagesPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [data, setData] = useState<Cage[]>([]);
+  const [siteData, setSiteData] = useState<{ site: string; cages: number; fish: number; health: number }[]>([]);
+
+  useEffect(() => {
+    getDashboardStats().then((result) => {
+      const mapped: Cage[] = result.cages.map((c: any) => ({
+        id: c.id,
+        cageNumber: c.cageNumber,
+        site: c.site?.name ?? '',
+        species: c.species?.name ?? 'None',
+        diameter: c.diameter ?? 0,
+        fishCount: c.currentFishCount ?? 0,
+        biomass: c.currentBiomass ?? 0,
+        doLevel: 0,
+        temp: 0,
+        status: cageStatus(c.status),
+        healthScore: 0,
+      }));
+
+      const inspMap = new Map<string, number>();
+      for (const insp of result.inspections) {
+        const key = insp.cageId;
+        if (!inspMap.has(key) && insp.healthScore != null) {
+          inspMap.set(key, insp.healthScore);
+        }
+      }
+      for (const c of mapped) {
+        c.healthScore = inspMap.get(c.id) ?? 0;
+      }
+
+      setData(mapped);
+
+      const siteMap = new Map<string, { cages: number; fish: number; healthScores: number[] }>();
+      for (const c of result.cages) {
+        const name = c.site?.name ?? 'Unknown';
+        if (!siteMap.has(name)) {
+          siteMap.set(name, { cages: 0, fish: 0, healthScores: [] });
+        }
+        const s = siteMap.get(name)!;
+        s.cages++;
+        s.fish += c.currentFishCount ?? 0;
+      }
+      setSiteData(
+        Array.from(siteMap.entries()).map(([site, info]) => ({
+          site,
+          cages: info.cages,
+          fish: info.fish,
+          health: info.healthScores.length > 0 ? Math.round(info.healthScores.reduce((a, b) => a + b, 0) / info.healthScores.length) : 0,
+        })),
+      );
+    });
+  }, []);
 
   const table = useReactTable({
     data, columns,
@@ -114,6 +161,10 @@ export default function CagesPage() {
     state: { sorting, globalFilter },
   });
 
+  const totalFish = data.reduce((s, c) => s + c.fishCount, 0);
+  const activeCount = data.filter(c => c.status === 'Active').length;
+  const avgHealth = data.filter(c => c.healthScore > 0).reduce((s, c) => s + c.healthScore, 0) / Math.max(data.filter(c => c.healthScore > 0).length, 1);
+
   return (
     <div className="space-y-6">
       <div>
@@ -123,9 +174,9 @@ export default function CagesPage() {
 
       <div className="grid gap-4 sm:grid-cols-4">
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Total Cages</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{data.length}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Active</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-600">{data.filter(c => c.status === 'Active').length}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Total Fish</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{data.reduce((s, c) => s + c.fishCount, 0).toLocaleString()}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Avg Health</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">87</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Active</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-emerald-600">{activeCount}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Total Fish</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{totalFish.toLocaleString()}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Avg Health</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{Math.round(avgHealth)}</div></CardContent></Card>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-4">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,13 +13,7 @@ import {
 } from 'recharts';
 import { computeNetAlerts } from '@argodive/shared';
 import type { NetAlertInput } from '@argodive/shared';
-
-const stats = [
-  { title: 'Active Cages', value: '24', change: '+2', icon: Grid3X3, color: 'text-ocean' },
-  { title: 'Fish Population', value: '242K', change: '+5.2%', icon: Waves, color: 'text-cyan-500' },
-  { title: 'Inspections This Week', value: '12', change: '+3', icon: ClipboardCheck, color: 'text-emerald-500' },
-  { title: 'Active Transfers', value: '4', change: '-1', icon: ArrowLeftRight, color: 'text-amber-500' },
-];
+import { getDashboardStats } from '@/app/actions/data';
 
 const weeklyOps = [
   { day: 'Mon', inspections: 3, transfers: 1, dives: 2 },
@@ -41,29 +35,60 @@ const envData = [
   { day: 'Sun', temp: 14.0, do: 7.7, salinity: 32.5 },
 ];
 
-const nets: NetAlertInput[] = [
-  { netNumber: 'N-001', cageId: 'C-001', site: 'North Farm', ageDays: 296, condition: 'Good' },
-  { netNumber: 'N-002', cageId: 'C-001', site: 'North Farm', ageDays: 98, condition: 'Excellent' },
-  { netNumber: 'N-003', cageId: 'C-002', site: 'North Farm', ageDays: 352, condition: 'Fair' },
-  { netNumber: 'N-004', cageId: 'C-003', site: 'South Bay', ageDays: 209, condition: 'Good' },
-  { netNumber: 'N-005', cageId: 'C-005', site: 'East Cove', ageDays: 428, condition: 'Damaged' },
-  { netNumber: 'N-006', cageId: 'C-006', site: 'North Farm', ageDays: 260, condition: 'Good' },
-  { netNumber: 'N-007', cageId: 'C-007', site: 'East Cove', ageDays: 143, condition: 'Excellent' },
-  { netNumber: 'N-008', cageId: 'C-003', site: 'South Bay', ageDays: 402, condition: 'Poor' },
-];
-
-const recentActivity = [
-  { action: 'Cage C-007 Inspection Completed', site: 'North Farm', time: '2 hrs ago', person: 'Sarah M.' },
-  { action: 'Fish Transfer: C-003 → C-004', site: 'South Bay', time: '4 hrs ago', person: 'John D.' },
-  { action: 'Net Replacement: N-002 on C-001', site: 'North Farm', time: '6 hrs ago', person: 'Mike T.' },
-  { action: 'Health Score Alert: C-005 at 78', site: 'East Cove', time: '8 hrs ago', person: 'System' },
-  { action: 'Mortality Collection: C-002', site: 'North Farm', time: '1 day ago', person: 'Diver Team A' },
-];
-
 export default function DashboardPage() {
-  const alerts = useMemo(() => computeNetAlerts(nets), []);
-  const criticalCount = alerts.filter(a => a.severity === 'critical').length;
-  const warningCount = alerts.filter(a => a.severity === 'warning').length;
+  const [stats, setStats] = useState([
+    { title: 'Active Cages', value: '0', change: '', icon: Grid3X3, color: 'text-ocean' },
+    { title: 'Fish Population', value: '0', change: '', icon: Waves, color: 'text-cyan-500' },
+    { title: 'Inspections This Week', value: '0', change: '', icon: ClipboardCheck, color: 'text-emerald-500' },
+    { title: 'Active Transfers', value: '0', change: '', icon: ArrowLeftRight, color: 'text-amber-500' },
+  ]);
+  const [recentActivity, setRecentActivity] = useState<{ action: string; site: string; time: string; person: string }[]>([]);
+  const [netAlertsInputs, setNetAlertsInputs] = useState<NetAlertInput[]>([]);
+
+  useEffect(() => {
+    getDashboardStats().then((result) => {
+      const { cages, inspections, transfers, netsData, stats } = result;
+
+      setStats([
+        { title: 'Active Cages', value: String(stats.activeCages), change: '', icon: Grid3X3, color: 'text-ocean' },
+        { title: 'Fish Population', value: (stats.totalFish / 1000).toFixed(1) + 'K', change: '', icon: Waves, color: 'text-cyan-500' },
+        { title: 'Inspections This Week', value: String(stats.inspectionsThisWeek), change: '', icon: ClipboardCheck, color: 'text-emerald-500' },
+        { title: 'Active Transfers', value: String(stats.activeTransfers), change: '', icon: ArrowLeftRight, color: 'text-amber-500' },
+      ]);
+
+      const activity: { action: string; site: string; time: string; person: string }[] = [];
+      for (const insp of inspections.slice(0, 3)) {
+        activity.push({
+          action: `Inspection: ${insp.title}`,
+          site: insp.cage?.cageNumber ?? '',
+          time: new Date(insp.scheduledDate).toLocaleDateString(),
+          person: insp.conductedBy?.name ?? 'TBD',
+        });
+      }
+      for (const t of transfers.slice(0, 2)) {
+        activity.push({
+          action: `Fish Transfer: ${t.fromCage?.cageNumber ?? ''} → ${t.toCage?.cageNumber ?? ''}`,
+          site: '',
+          time: new Date(t.scheduledDate).toLocaleDateString(),
+          person: t.performedBy?.name ?? 'Planned',
+        });
+      }
+      setRecentActivity(activity);
+
+      const netInputs: NetAlertInput[] = netsData.map((n: any) => ({
+        netNumber: n.netNumber,
+        cageId: n.cage?.cageNumber ?? '',
+        site: '',
+        ageDays: n.installationDate ? Math.floor((Date.now() - new Date(n.installationDate).getTime()) / 86400000) : 0,
+        condition: n.condition,
+      }));
+      setNetAlertsInputs(netInputs);
+    });
+  }, []);
+
+  const alerts = useMemo(() => computeNetAlerts(netAlertsInputs), [netAlertsInputs]);
+  const criticalCount = alerts.filter((a) => a.severity === 'critical').length;
+  const warningCount = alerts.filter((a) => a.severity === 'warning').length;
 
   return (
     <div className="space-y-6">
@@ -99,7 +124,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{s.value}</div>
-              <p className={`text-xs ${s.change.startsWith('+') ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{s.change} from yesterday</p>
+              <p className={`text-xs ${s.change.startsWith('+') ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{s.change || 'Real-time data'}</p>
             </CardContent>
           </Card>
         ))}
@@ -160,6 +185,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
+              {recentActivity.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No recent activity</p>
+              )}
               {recentActivity.map((a, i) => (
                 <div key={i} className="flex items-start gap-3 rounded-lg border p-3">
                   <div className="mt-0.5 h-2 w-2 rounded-full bg-ocean shrink-0" />

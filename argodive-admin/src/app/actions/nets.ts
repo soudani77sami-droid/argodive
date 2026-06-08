@@ -1,9 +1,9 @@
 'use server';
 
-import { createSuccess } from '@/lib/actions';
+import { prisma } from '@argodive/shared';
+import { createSuccess, createError } from '@/lib/actions';
 import type { ActionState } from '@/lib/actions';
 import { revalidatePath } from 'next/cache';
-import { mockList, mockCreate, mockUpdate, mockDelete, toPlainObject } from '@/lib/mock-data';
 
 type NetInput = {
   netNumber: string;
@@ -18,24 +18,68 @@ type NetInput = {
 };
 
 export async function listNets(): Promise<ActionState<unknown[]>> {
-  const data = toPlainObject(mockList('nets'));
-  return createSuccess(data);
+  try {
+    const data = await prisma.net.findMany({
+      include: { cage: true },
+      orderBy: { netNumber: 'asc' },
+    });
+    return createSuccess(data);
+  } catch {
+    return createError('Failed to fetch nets');
+  }
 }
 
 export async function createNet(data: NetInput): Promise<ActionState> {
-  mockCreate('nets', data);
-  revalidatePath('/nets');
-  return createSuccess();
+  try {
+    await prisma.net.create({
+      data: {
+        netNumber: data.netNumber,
+        cageId: data.cageId,
+        meshSize: data.meshSize,
+        material: data.material as any,
+        depth: data.depth,
+        circumference: data.circumference,
+        condition: data.condition as any,
+        installationDate: data.installationDate ? new Date(data.installationDate) : undefined,
+        notes: data.notes,
+      },
+    });
+    revalidatePath('/nets');
+    return createSuccess();
+  } catch {
+    return createError('Failed to create net');
+  }
 }
 
 export async function updateNet(id: string, data: NetInput): Promise<ActionState> {
-  mockUpdate('nets', id, data);
-  revalidatePath('/nets');
-  return createSuccess();
+  try {
+    await prisma.net.update({
+      where: { id },
+      data: {
+        netNumber: data.netNumber,
+        cageId: data.cageId,
+        meshSize: data.meshSize,
+        material: data.material as any,
+        depth: data.depth,
+        circumference: data.circumference,
+        condition: data.condition as any,
+        installationDate: data.installationDate ? new Date(data.installationDate) : undefined,
+        notes: data.notes,
+      },
+    });
+    revalidatePath('/nets');
+    return createSuccess();
+  } catch {
+    return createError('Failed to update net');
+  }
 }
 
 export async function deleteNet(id: string): Promise<ActionState> {
-  mockDelete('nets', id);
-  revalidatePath('/nets');
-  return createSuccess();
+  try {
+    await prisma.net.delete({ where: { id } });
+    revalidatePath('/nets');
+    return createSuccess();
+  } catch {
+    return createError('Failed to delete net');
+  }
 }
