@@ -1,10 +1,14 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
+  "globalEnv": ["DATABASE_URL", "DIRECT_URL", "NODE_PATH"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "@argodive/shared#build": {
+      "cache": false
     },
     "dev": {
       "cache": false,
