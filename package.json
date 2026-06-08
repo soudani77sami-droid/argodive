@@ -1,0 +1,31 @@
+{
+  "name": "argodive",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ArgoDive - Aquaculture Diving Management System",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "clean": "turbo clean",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:generate": "npm run db:generate -w packages/shared",
+    "db:push": "npm run db:push -w packages/shared",
+    "db:studio": "npm run db:studio -w packages/shared"
+  },
+  "workspaces": [
+    "argodive-web",
+    "argodive-admin",
+    "packages/shared"
+  ],
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "prettier": "^3.4.0",
+    "prettier-plugin-tailwindcss": "^0.6.0"
+  },
+  "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

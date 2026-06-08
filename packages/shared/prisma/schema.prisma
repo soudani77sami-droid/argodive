@@ -1,0 +1,536 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // For Neon: unset for pooled, set to direct connection for migrations
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  STAFF
+  GUEST
+}
+
+enum DiverStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  SUSPENDED
+  RETIRED
+}
+
+enum DiveRole {
+  DIVER
+  SUPERVISOR
+  SAFETY_OFFICER
+  TENDER
+}
+
+enum DiveStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DECOMPRESSION
+}
+
+enum DiveType {
+  INSPECTION
+  MAINTENANCE
+  HARVEST
+  INSTALLATION
+  EMERGENCY
+  TRAINING
+}
+
+enum SiteType {
+  CAGE
+  PEN
+  NET
+  FAD
+  OTHER
+}
+
+enum EquipmentStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  RETIRED
+  LOST
+}
+
+enum IncidentSeverity {
+  MINOR
+  MODERATE
+  SERIOUS
+  CRITICAL
+  FATAL
+}
+
+enum SpeciesCategory {
+  FINFISH
+  SHELLFISH
+  CRUSTACEAN
+  SEAWEED
+  OTHER
+}
+
+enum GrowthStage {
+  FRY
+  JUVENILE
+  GROW_OUT
+  ADULT
+  BROODSTOCK
+}
+
+enum CageShape {
+  CIRCULAR
+  SQUARE
+  OCTAGONAL
+  RECTANGULAR
+  OTHER
+}
+
+enum CageStatus {
+  ACTIVE
+  EMPTY
+  STOCKING
+  HARVESTING
+  FALLOW
+  MAINTENANCE
+  DECOMMISSIONED
+}
+
+enum NetMaterial {
+  NYLON
+  POLYETHYLENE
+  POLYESTER
+  GALVANIZED_STEEL
+  COPPER_ALLOY
+  OTHER
+}
+
+enum NetCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  DAMAGED
+  REPLACED
+}
+
+enum InspectionType {
+  ROUTINE
+  STRUCTURAL
+  PRE_HARVEST
+  POST_STORM
+  EMERGENCY
+  ENVIRONMENTAL
+  HEALTH
+  MORTALITY
+}
+
+enum InspectionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+enum TransferReason {
+  GRADING
+  STOCKING
+  RESTOCKING
+  HARVEST
+  SPLITTING
+  MEDICAL_TREATMENT
+  MORTALITY_REMOVAL
+  RELOCATION
+  OTHER
+}
+
+enum TransferStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  role          UserRole @default(STAFF)
+  phone         String?
+  avatar        String?
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  diver           Diver?
+  diveSites       DiveSite[]
+  diveOperations  DiveOperation[]
+  diveLogs        DiveLog[]
+  diveTeamMembers DiveTeamMember[]
+  inspections     Inspection[]
+  fishTransfers   FishTransfer[]
+
+  @@map("users")
+}
+
+model Diver {
+  id             String      @id @default(cuid())
+  userId         String      @unique
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  certification  String?
+  specialties    String?
+  maxDepth       Float?
+  totalDiveHours Float       @default(0)
+  medicalCert    String?
+  medicalExpiry  DateTime?
+  status         DiverStatus @default(ACTIVE)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  diveTeams DiveTeam[]
+  diveLogs  DiveLog[]
+
+  @@map("divers")
+}
+
+model DiveSite {
+  id          String   @id @default(cuid())
+  name        String
+  siteType    SiteType @default(CAGE)
+  location    String?
+  coordinates String?
+  depth       Float?
+  description String?
+  isActive    Boolean  @default(true)
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  diveOperations DiveOperation[]
+  cages          Cage[]
+
+  @@map("dive_sites")
+}
+
+model DiveOperation {
+  id               String     @id @default(cuid())
+  title            String
+  description      String?
+  diveType         DiveType   @default(INSPECTION)
+  status           DiveStatus @default(PLANNED)
+  siteId           String
+  site             DiveSite   @relation(fields: [siteId], references: [id])
+  plannedDate      DateTime
+  startTime        DateTime?
+  endTime          DateTime?
+  maxDepth         Float?
+  bottomTime       Int?
+  weatherCondition String?
+  waterTemp        Float?
+  visibility       Float?
+  notes            String?
+  createdById      String
+  createdBy        User       @relation(fields: [createdById], references: [id])
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  diveTeams  DiveTeam[]
+  diveLogs   DiveLog[]
+  checklists Checklist[]
+  incidents  Incident[]
+
+  @@map("dive_operations")
+}
+
+model DiveTeam {
+  id          String        @id @default(cuid())
+  operationId String
+  operation   DiveOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  role        DiveRole      @default(DIVER)
+  diverId     String
+  diver       Diver         @relation(fields: [diverId], references: [id])
+  assignedAt  DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  teamMembers DiveTeamMember[]
+  diveLogs    DiveLog[]
+
+  @@unique([operationId, diverId])
+  @@map("dive_teams")
+}
+
+model DiveTeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      DiveTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      DiveRole @default(DIVER)
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+  @@map("dive_team_members")
+}
+
+model DiveLog {
+  id             String        @id @default(cuid())
+  operationId    String
+  operation      DiveOperation @relation(fields: [operationId], references: [id])
+  diverId        String
+  diver          Diver         @relation(fields: [diverId], references: [id])
+  teamId         String?
+  team           DiveTeam?     @relation(fields: [teamId], references: [id])
+  role           DiveRole      @default(DIVER)
+  diveDate       DateTime      @default(now())
+  startTime      DateTime
+  endTime        DateTime?
+  maxDepth       Float?
+  avgDepth       Float?
+  bottomTime     Int?
+  waterTemp      Float?
+  visibility     Float?
+  equipment      String?
+  tasks          String?
+  findings       String?
+  incidentNotes  String?
+  gasMix         String?
+  tankStart      Float?
+  tankEnd        Float?
+  airConsumption Float?
+  notes          String?
+  createdById    String
+  createdBy      User          @relation(fields: [createdById], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  incidents Incident[]
+
+  @@map("dive_logs")
+}
+
+model Checklist {
+  id          String        @id @default(cuid())
+  operationId String
+  operation   DiveOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  isCompleted Boolean       @default(false)
+  completedBy String?
+  completedAt DateTime?
+  sortOrder   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("checklists")
+}
+
+model Equipment {
+  id             String          @id @default(cuid())
+  name           String
+  type           String
+  serialNumber   String?         @unique
+  brand          String?
+  model          String?
+  purchaseDate   DateTime?
+  lastInspection DateTime?
+  nextInspection DateTime?
+  status         EquipmentStatus @default(AVAILABLE)
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@map("equipment")
+}
+
+model Incident {
+  id           String           @id @default(cuid())
+  diveLogId    String?
+  diveLog      DiveLog?         @relation(fields: [diveLogId], references: [id])
+  operationId  String?
+  operation    DiveOperation?   @relation(fields: [operationId], references: [id])
+  title        String
+  description  String
+  severity     IncidentSeverity @default(MINOR)
+  actionTaken  String?
+  reportedById String
+  reportedAt   DateTime         @default(now())
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@map("incidents")
+}
+
+model Species {
+  id                 String          @id @default(cuid())
+  name               String
+  scientificName     String?
+  code               String          @unique
+  category           SpeciesCategory @default(FINFISH)
+  description        String?
+  optimalTempMin     Float?
+  optimalTempMax     Float?
+  optimalSalinityMin Float?
+  optimalSalinityMax Float?
+  optimalDO          Float?
+  growthRate         Float?
+  maxDensity         Float?
+  avgMarketWeight    Float?
+  daysToHarvest      Int?
+  imageUrl           String?
+  isActive           Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  cages         Cage[]
+  fishTransfers FishTransfer[]
+
+  @@map("species")
+}
+
+model Cage {
+  id               String     @id @default(cuid())
+  cageNumber       String
+  name             String?
+  siteId           String
+  site             DiveSite   @relation(fields: [siteId], references: [id])
+  speciesId        String?
+  species          Species?   @relation(fields: [speciesId], references: [id])
+  shape            CageShape  @default(CIRCULAR)
+  depth            Float?
+  circumference    Float?
+  diameter         Float?
+  volume           Float?
+  maxCapacity      Int?
+  currentFishCount Int?
+  currentBiomass   Float?
+  avgWeight        Float?
+  stockingDensity  Float?
+  status           CageStatus @default(EMPTY)
+  installationDate DateTime?
+  lastCleaningDate DateTime?
+  lastStockingDate DateTime?
+  lastHarvestDate  DateTime?
+  notes            String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  nets          Net[]
+  inspections   Inspection[]
+  transfersFrom FishTransfer[] @relation("TransferFromCage")
+  transfersTo   FishTransfer[] @relation("TransferToCage")
+
+  @@unique([siteId, cageNumber])
+  @@map("cages")
+}
+
+model Net {
+  id               String       @id @default(cuid())
+  cageId           String
+  cage             Cage         @relation(fields: [cageId], references: [id], onDelete: Cascade)
+  netNumber        String
+  meshSize         Float?
+  material         NetMaterial  @default(NYLON)
+  depth            Float?
+  circumference    Float?
+  condition        NetCondition @default(GOOD)
+  installationDate DateTime?
+  removalDate      DateTime?
+  lastCleaningDate DateTime?
+  lastRepairDate   DateTime?
+  notes            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([cageId, netNumber])
+  @@map("nets")
+}
+
+model Inspection {
+  id              String           @id @default(cuid())
+  cageId          String
+  cage            Cage             @relation(fields: [cageId], references: [id], onDelete: Cascade)
+  inspectionType  InspectionType   @default(ROUTINE)
+  title           String
+  description     String?
+  scheduledDate   DateTime
+  completedDate   DateTime?
+  conductedById   String?
+  conductedBy     User?            @relation(fields: [conductedById], references: [id])
+  healthScore     Int?
+  mortalityRate   Float?
+  mortalityCount  Int?
+  biomass         Float?
+  avgWeight       Float?
+  waterTemp       Float?
+  dissolvedOxygen Float?
+  salinity        Float?
+  visibility      Float?
+  findings        String?
+  recommendations String?
+  status          InspectionStatus @default(SCHEDULED)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  photos Photo[]
+
+  @@map("inspections")
+}
+
+model Photo {
+  id           String     @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  url          String
+  thumbnailUrl String?
+  fileName     String
+  originalName String
+  mimeType     String     @default("image/jpeg")
+  size         Int?
+  width        Int?
+  height       Int?
+  caption      String?
+  altText      String?
+  takenAt      DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@map("photos")
+}
+
+model FishTransfer {
+  id            String         @id @default(cuid())
+  fromCageId    String
+  fromCage      Cage           @relation("TransferFromCage", fields: [fromCageId], references: [id])
+  toCageId      String
+  toCage        Cage           @relation("TransferToCage", fields: [toCageId], references: [id])
+  speciesId     String
+  species       Species        @relation(fields: [speciesId], references: [id])
+  fishCount     Int
+  avgWeight     Float?
+  totalWeight   Float?
+  reason        TransferReason @default(GRADING)
+  status        TransferStatus @default(PLANNED)
+  scheduledDate DateTime
+  completedDate DateTime?
+  performedById String?
+  performedBy   User?          @relation(fields: [performedById], references: [id])
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("fish_transfers")
+}

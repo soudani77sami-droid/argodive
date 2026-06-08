@@ -1,0 +1,7 @@
+{
+  "buildCommand": "cd .. && npm ci && npx turbo build --filter=@argodive/web...",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "installCommand": "cd .. && npm ci",
+  "ignoreCommand": "npx turbo-ignore --fallback=HEAD^"
+}
