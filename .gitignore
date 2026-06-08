@@ -40,3 +40,5 @@ next-env.d.ts
 
 # prisma (local development only — migrations must be committed for Vercel)
 # packages/shared/prisma/migrations/
+
+.vercel

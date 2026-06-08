@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd .. && npm ci && npx turbo build --filter=@argodive/web...",
+  "buildCommand": "npx turbo build --filter=@argodive/web...",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "cd .. && npm ci",
